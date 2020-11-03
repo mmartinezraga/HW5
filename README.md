@@ -1,1 +1,172 @@
-# HW5
+
+
+<p style="color:rgb(182,18,27);font-family:corbel">Mónica Martínez-Raga</p>
+<p style="color:rgb(182,18,27);font-family:corbel">HW5- Fall 2020</p>
+<p style="color:rgb(182,18,27);font-family:corbel">POLYNOMIALS</p>
+<p style="color:rgb(182,18,27);font-family:corbel">Collaborators: Isabela Vieira</p>
+
+
+In the interest of concentrating on a smaller subset, I chose to observe Black New Yorkers for this lab to analyze a relationship between age, gender, and wage. Age was determined as 25 to 66. 25 is the age of emancipation from dependency of parents for most people, and 62 is the age workers can start receiving social security in New York, which prompts many to retire. I am considering people in the labor force, who work full-time, for wages, and have at least a college degree. I did not determine gender because I want to compare it further down.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "")
+getwd()
+load("acs2017_ny_data.RData")
+acs2017_ny[1:10,1:7]
+attach(acs2017_ny)
+```
+
+```{r}
+use_varb <- (AGE >= 25) & (AGE <= 62) & (LABFORCE == 2) & (WKSWORK2 > 4) & (UHRSWORK >= 35) & (CLASSWKR == 2) & (RACE == 2) & ((educ_college == 1) | (educ_advdeg == 1))
+dat_use <- subset(acs2017_ny,use_varb) # 
+detach()
+attach(dat_use)
+```
+
+```{r}
+install.packages(c("AER", "stargazer"))
+```
+
+
+First, I will observe how income changes with age for the entire determined Black population performing a linear model. 
+
+The null hypothesis is that there is no relationship.
+
+As the data suggests below, for every additional year of age, income increase $787 on average. We can reject the null hypothesis because the P-value is smaller than the significance level of 0.001. Age is indeed a statistically significant.
+
+```{r}
+linear <- lm(INCWAGE ~ AGE)
+summary(linear)
+require(stargazer)
+stargazer(linear, type = "text")
+NNobs <- length(INCWAGE)
+set.seed(12345)
+graph_obs <- (runif(NNobs) < 0.1)
+dat_graph <- subset(dat_use, graph_obs)
+plot(INCWAGE ~ jitter(AGE, factor = 2), pch = 16, col =rgb(0.5, 0.5, 0.5, alpha = 0.2), ylim = c(0,170000), data = dat_graph)
+to_be_predicted1 <- data.frame(AGE = 25:66, educ_college = 1, educ_advdeg = 1)
+to_be_predicted1$yhat <- predict(linear, newdata = to_be_predicted1)
+lines(yhat ~ AGE, data = to_be_predicted1)
+detach()
+```
+
+I will try this model using a polynomial for our x variable AGE because the linear model is not entirely representative of the relationship between income and age. We would expect that income peaks at a certain age, given that many people retire after that age, or income stagnates due to diminishing career progression or demotions. 
+
+As we can see below, AGE and AGE^2 are both significant, with P value smaller than 0.001. After fitting with AGE^2, the r-squared improved from 0.021 to 0.03 meaning that AGE in this model better represents the variation in income. This would be th emost appropriate model for age.
+
+Now that the line is a quadratic, the graph depicts a peak at less than $100k and around 55 years of age which we will calculate later. I will make the observation that this peak seems very much lower and later in life than the average wage peak for the entire sample of New Yorkers equal to this sample expect for race. Although unfortunate, this is not surprising since Black folks are within the minority groups who are many times compensated less than non-BIPOC counterparts. I expect the gap to be bigger for Black women as we will observe later.
+
+```{r}
+expo2 <- lm(INCWAGE ~ AGE + I(AGE^2))
+summary(expo2)
+require(stargazer)
+stargazer(expo2, type = "text")
+NNobs <- length(INCWAGE)
+set.seed(12345)
+graph_obs <- (runif(NNobs) < 0.1)
+dat_graph <- subset(dat_use, graph_obs)
+plot(INCWAGE ~ jitter(AGE, factor = 2), pch = 16, col =rgb(0.5, 0.5, 0.5, alpha = 0.2), ylim = c(0,170000), data = dat_graph)
+to_be_predicted1 <- data.frame(AGE = 25:66)
+to_be_predicted1$yhat <- predict(expo2, newdata = to_be_predicted1)
+lines(yhat ~ AGE, data = to_be_predicted1)
+detach()
+```
+
+To find the average peak age for income for our entire sample of Black New Yorkers, we calculate the maximum or peak of the parabola. 
+
+I attempted to use the code provided by this link, but it was fit for a cubic rather than a quadratic (and after several attempts I did not find out how to tailor it for AGE^2).
+https://stackoverflow.com/questions/48505900/how-to-find-and-plot-the-local-maxima-of-a-polynomial-regression-curve-in-r
+
+Therefore I will do so manually.
+
+```{r}
+coef(expo2)
+```
+
+The parabolic equation consists : -52717.4349 + 5491.2211 AGE -55.1017 AGE^2
+
+As observed below, the point where income diminishes is as 50, when income on average peaks to $84,091 for educated Black New Yorkers.
+```{r}
+c = -52717.4349
+b = 5491.2211
+a = -55.1017
+  
+max_y = c - ((b^2) / (4*a))
+max_x = (-b / (2*a))
+print(paste0("The vertex for this regression is ", round(max_x, digits = 2), ", ", round(max_y, digits = 2), "."))
+```
+
+
+
+Now I try the linear model with higher polynomials. First I examined with AGE^3. Our R-squared did not change but our P values increased significantly. As we can see below, AGE^4 increased our P values, denominating AGE insignificant as it is elevated to higher-order polynomials. R-squared also only increased 0.02. For this variable, elevating to powers higher than 2 has a diminishing effect on our fit, accounting for less variation. 
+
+```{r}
+expo4 <- lm(INCWAGE ~ AGE + I(AGE^2) + I(AGE^3) + I(AGE^4))
+summary(expo4)
+require(stargazer)
+stargazer(expo4, type = "text")
+NNobs <- length(INCWAGE)
+set.seed(12345)
+graph_obs <- (runif(NNobs) < 0.1)
+dat_graph <- subset(dat_use, graph_obs)
+plot(INCWAGE ~ jitter(AGE, factor = 2), pch = 16, col =rgb(0.5, 0.5, 0.5, alpha = 0.2), ylim = c(0,170000), data = dat_graph)
+to_be_predicted1 <- data.frame(AGE = 25:66, educ_college = 1, aduc_advdeg = 1)
+to_be_predicted1$yhat <- predict(expo4, newdata = to_be_predicted1)
+lines(yhat ~ AGE, data = to_be_predicted1)
+detach()
+```
+
+Testing for the use of log, we get the output below. Significance actually increased by a bit with a small decrease in P-value, and a 0.003 increase in the R-square. I wouldn't say the change is very important in this sample since we only have 2,208 observations. The difference may be much important with a larger dataset.
+
+Polynomials for log will not work because of the innate nature of log. Elevating log to any power will only multiply our variable by that exponent. It has no effect on the regression.
+
+```{r}
+linearlog <- lm(INCWAGE ~ log(AGE))
+summary(linearlog)
+require(stargazer)
+stargazer(linearlog, type = "text")
+NNobs <- length(INCWAGE)
+set.seed(12345)
+graph_obs <- (runif(NNobs) < 0.1)
+dat_graph <- subset(dat_use, graph_obs)
+plot(INCWAGE ~ jitter(log(AGE), factor = 2), pch = 16, col =rgb(0.5, 0.5, 0.5, alpha = 0.2), ylim = c(0,170000), data = dat_graph)
+to_be_predicted1 <- data.frame(AGE = 25:66, educ_college = 1, aduc_advdeg = 1)
+to_be_predicted1$yhat <- predict(linearlog, newdata = to_be_predicted1)
+lines(yhat ~ log(AGE), data = to_be_predicted1)
+detach()
+```
+
+
+As a dummy variable, I will add "female" to run the regression and compare wage-age relationship between Black men and women. The cofficients are the same for dummy variables, we simply see the different representation for each group. 
+
+female = 1 :: women
+female = 0 :: men
+
+The p-value for female variable is below the signifance level of 0.001, therefore female is signficant althought slightly less than age. R-squared has increased more than any iteration of AGE, that was to be expected as we add more relevant variables to compensate for variation. This should be the case when we add other dummy variables such as educ_college and educ_advdeg. Inherintly, dummy variables cannot be polynomials because of their binomial nature. The variable only has two possible outcomes unlike age or wage.
+
+Althought this was not shown in the summary, graphically we can see how the line shifts downward for Black women, showing different peaks for both groups and a gender-based wage gap as expected.
+
+```{r}
+gender <- lm(INCWAGE ~ AGE + I(AGE^2) + female)
+summary(gender)
+require(stargazer)
+stargazer(gender, type = "text")
+NNobs <- length(INCWAGE)
+set.seed(12345)
+graph_obs <- (runif(NNobs) < 0.1)
+dat_graph <- subset(dat_use, graph_obs)
+plot(INCWAGE ~ jitter(AGE, factor = 2), pch = 16, col =rgb(0.5, 0.5, 0.5, alpha = 0.2), ylim = c(0,170000), data = dat_graph)
+to_be_predicted1 <- data.frame(AGE = 25:66, female = 0, educ_college = 1, aduc_advdeg = 1)
+to_be_predicted1$yhat <- predict(gender, newdata = to_be_predicted1)
+lines(yhat ~ AGE, data = to_be_predicted1)
+detach()
+NNobs <- length(INCWAGE)
+set.seed(12345)
+graph_obs <- (runif(NNobs) < 0.1)
+dat_graph <- subset(dat_use, graph_obs)
+plot(INCWAGE ~ jitter(AGE, factor = 2), pch = 16, col =rgb(0.5, 0.5, 0.5, alpha = 0.2), ylim = c(0,170000), data = dat_graph)
+to_be_predicted1 <- data.frame(AGE = 25:66, female = 1, educ_college = 1, aduc_advdeg = 1)
+to_be_predicted1$yhat <- predict(gender, newdata = to_be_predicted1)
+lines(yhat ~ AGE, data = to_be_predicted1)
+detach()
